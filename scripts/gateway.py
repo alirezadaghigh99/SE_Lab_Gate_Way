@@ -174,6 +174,35 @@ def signin():
         return jsonify(message="Login Successful", jwt=token), HTTPStatus.OK
     return jsonify(message='Invalid Password'), HTTPStatus.UNAUTHORIZED
 
+@app.route('/admin-signin', methods=['POST'])
+def admin_signin():
+    json = request.json
+    try:
+        username = json.get('username')
+    except:
+        return jsonify(message="username is not given"), HTTPStatus.BAD_REQUEST
+
+    try:
+        password = json.get('password')
+    except:
+        return jsonify(message="Password is not given"), HTTPStatus.BAD_REQUEST
+    user_url = f"/admin/{username}"
+    response = circuit_breaker.send_request( requests.get,account_service, user_url)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+
+    user = response.json()['user']
+    expire_time = (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp()
+    if check_password_hash(user['hashed_passwd'], password):
+        payload = {
+            'sub': username,
+            'exp': expire_time
+        }
+        token = jwt.encode(payload, app.config.get('SECRET_KEY'), algorithm='HS256')
+        return jsonify(message="Login as admin Successful", jwt=token), HTTPStatus.OK
+    return jsonify(message='Invalid Password'), HTTPStatus.UNAUTHORIZED
+
+
 @app.route('/doctors', methods=['GET'])
 @token_required
 def get_doctors(username):
