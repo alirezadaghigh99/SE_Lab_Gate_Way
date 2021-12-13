@@ -131,6 +131,21 @@ def signup():
     return response.content, response.status_code, response.headers.items()
 
 
+@app.route('/admin-signup', methods=['POST'])
+def admin_signup():
+    json = request.json
+    print(request.json)
+    try:
+        password = json.pop('password', None)
+
+    except:
+        return jsonify(message='Password is not given'), HTTPStatus.BAD_REQUEST
+
+    json['hashed_passwd'] = generate_password_hash(password)
+    response = circuit_breaker.send_request(requests.post, account_service, "/create_admin", json=json)
+    return response.content, response.status_code, response.headers.items()
+
+
 @app.route('/signin', methods=['POST'])
 def signin():
     json = request.json
