@@ -1,3 +1,5 @@
+from functools import wraps
+
 import jwt
 from flask import Flask, request
 from flask.json import jsonify
@@ -9,6 +11,39 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
+
+
+
+def decode_token(auth_token):
+
+    try:
+        payload = jwt.decode(auth_token, app.config["SECRET_KEY"], algorithms='HS256')
+        return payload["sub"]
+    except jwt.ExpiredSignatureError:
+        return "your token is expired, please try again"
+    except jwt.InvalidTokenError:
+        return "please login first"
+
+def token_required(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        token = None
+        if 'x-access-tokens' in request.headers:
+            token =  request.headers['x-access-tokens']
+        if not token:
+            return jsonify({"message" : "token is missing, login first"}), HTTPStatus.UNAUTHORIZED
+        try:
+            print("salam")
+            username = decode_token(token)
+            print(username)
+
+        except Exception as e:
+            return jsonify(message=str(e)), HTTPStatus.UNAUTHORIZED
+
+        return f(username, *args, **kwargs)
+
+    return decorator
+
 
 
 class Service:
@@ -124,7 +159,16 @@ def signin():
         return jsonify(message="Login Successful", jwt=token), HTTPStatus.OK
     return jsonify(message='Invalid Password'), HTTPStatus.UNAUTHORIZED
 
+@app.route('/doctors', methods=['GET'])
+@token_required
+def get_doctors(username):
+    success_url = "/show_doctors"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    return response.content, response.status_code, response.headers.items()
 
 @app.route("/")
 def home():
     return 'hi'
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5001)
