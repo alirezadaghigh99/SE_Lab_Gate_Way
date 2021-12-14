@@ -212,7 +212,7 @@ def get_doctors(username):
 @app.route('/patients', methods=['GET'])
 @token_required
 def get_patients(username):
-    success_url = "/show_doctors"
+    success_url = "/show_patients"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
 
@@ -221,6 +221,14 @@ def get_patients(username):
 @token_required
 def user_profile(username):
     success_url = "/user_profile"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
+    return response.content, response.status_code, response.headers.items()
+
+
+@app.route("/profile-admin")
+@token_required
+def admin_profile(username):
+    success_url = "/admin_profile"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
 
