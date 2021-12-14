@@ -1,0 +1,52 @@
+swagger: "2.0"
+info:
+  description: "This is a api documatation for exp 7"
+  version: "1.0.0"
+  title: "Swagger api exp7"
+
+host: "petstore.swagger.io"
+basePath: "/v2"
+tags:
+- name: "useraccount"
+  description: "Everything about your user accounts"
+  externalDocs:
+    description: "Find out more"
+    url: "http://swagger.io"
+- name: "store"
+  description: "Access to Petstore orders"
+- name: "user"
+  description: "Operations about user"
+  externalDocs:
+    description: "Find out more about our store"
+    url: "http://swagger.io"
+schemes:
+- "https"
+- "http"
+paths:
+  /signup:
+    post:
+      tags:
+      - "useraccount"
+      summary: "Add a new user to the hospital. doctor or patien"
+      description: ""
+      operationId: "add user"
+      consumes:
+      - "application/json"
+      - "application/xml"
+      produces:
+      - "application/xml"
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "User object that needs to be added to the db"
+        required: true
+        schema:
+          $ref: "#/definitions/User"
+      responses:
+        "404":
+          description: "Invalid input"
+      security:
+      - petstore_auth:
+        - "write:users"
+        - "read:users"
