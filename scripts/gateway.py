@@ -13,9 +13,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
 
 
-
 def decode_token(auth_token):
-
     try:
         payload = jwt.decode(auth_token, app.config["SECRET_KEY"], algorithms='HS256')
         return payload["sub"]
@@ -24,18 +22,17 @@ def decode_token(auth_token):
     except jwt.InvalidTokenError:
         return "please login first"
 
+
 def token_required(f):
     @wraps(f)
     def decorator(*args, **kwargs):
         token = None
         if 'x-access-tokens' in request.headers:
-            token =  request.headers['x-access-tokens']
+            token = request.headers['x-access-tokens']
         if not token:
-            return jsonify({"message" : "token is missing, login first"}), HTTPStatus.UNAUTHORIZED
+            return jsonify({"message": "token is missing, login first"}), HTTPStatus.UNAUTHORIZED
         try:
-            print("salam")
             username = decode_token(token)
-            print(username)
 
         except Exception as e:
             return jsonify(message=str(e)), HTTPStatus.UNAUTHORIZED
@@ -43,7 +40,6 @@ def token_required(f):
         return f(username, *args, **kwargs)
 
     return decorator
-
 
 
 class Service:
@@ -70,6 +66,7 @@ class CircuitBreaker:
         self.failure_count = fc
 
     def send_request(self, func, service, url, *args, **kwargs):
+
         if service.id in self.services:
             status = self.services[service.id]
             if status.state == 'o':
@@ -159,7 +156,7 @@ def signin():
     except:
         return jsonify(message="Password is not given"), HTTPStatus.BAD_REQUEST
     user_url = f"/user/{n_id}"
-    response = circuit_breaker.send_request( requests.get,account_service, user_url)
+    response = circuit_breaker.send_request(requests.get, account_service, user_url)
     if response.status_code != HTTPStatus.OK:
         return response.content, response.status_code, response.headers.items()
 
@@ -174,6 +171,7 @@ def signin():
         return jsonify(message="Login Successful", jwt=token), HTTPStatus.OK
     return jsonify(message='Invalid Password'), HTTPStatus.UNAUTHORIZED
 
+
 @app.route('/admin-signin', methods=['POST'])
 def admin_signin():
     json = request.json
@@ -187,7 +185,7 @@ def admin_signin():
     except:
         return jsonify(message="Password is not given"), HTTPStatus.BAD_REQUEST
     user_url = f"/admin/{username}"
-    response = circuit_breaker.send_request( requests.get,account_service, user_url)
+    response = circuit_breaker.send_request(requests.get, account_service, user_url)
     if response.status_code != HTTPStatus.OK:
         return response.content, response.status_code, response.headers.items()
 
@@ -207,12 +205,30 @@ def admin_signin():
 @token_required
 def get_doctors(username):
     success_url = "/show_doctors"
-    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
+
+
+@app.route('/patients', methods=['GET'])
+@token_required
+def get_patients(username):
+    success_url = "/show_doctors"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
+    return response.content, response.status_code, response.headers.items()
+
+
+@app.route("/profile")
+@token_required
+def user_profile(username):
+    success_url = "/user_profile"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
+    return response.content, response.status_code, response.headers.items()
+
 
 @app.route("/")
 def home():
     return 'hi'
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
