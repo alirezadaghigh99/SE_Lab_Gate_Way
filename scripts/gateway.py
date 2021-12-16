@@ -8,10 +8,11 @@ from http import HTTPStatus
 import datetime
 import requests
 from werkzeug.security import generate_password_hash, check_password_hash
+from flasgger import  Swagger
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
-
+swagger = Swagger(app)
 
 def decode_token(auth_token):
     try:
@@ -113,8 +114,48 @@ account_service = Service("Account Service", "127.0.0.1", 5000)
 circuit_breaker = CircuitBreaker(10000, 3)
 
 
+
+
+
+
 @app.route('/signup', methods=['POST'])
 def signup():
+    """signup users
+    This is using docstrings for specifications.
+    ---
+    parameters:
+      - name: national_id
+        in  : body
+        type: string
+        required: true
+        default:
+
+      - name: password
+        in : body
+        type: string
+        required: true
+        default:
+      - name: name
+        in : body
+        type: string
+        required: true
+        default:
+      - name: role
+        in : body
+        type: string
+        required: true
+        default: doctor
+    responses:
+      201:
+        description: user created
+
+      409:
+        description: user already exists
+
+      400:
+        description: Bad request
+
+    """
     json = request.json
     print(request.json)
     try:
@@ -130,6 +171,32 @@ def signup():
 
 @app.route('/admin-signup', methods=['POST'])
 def admin_signup():
+    """signup admins
+    This is using docstrings for specifications.
+    ---
+    parameters:
+      - name: username
+        in : body
+        type: string
+        required: true
+        default:
+      - name: password
+        in: body
+        type: string
+        required: true
+
+
+    responses:
+      201:
+        description: user created
+
+      409:
+        description: user already exists
+
+      400:
+        description: Bad request
+
+    """
     json = request.json
     print(request.json)
     try:
