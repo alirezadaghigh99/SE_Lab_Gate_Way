@@ -8,11 +8,17 @@ from http import HTTPStatus
 import datetime
 import requests
 from werkzeug.security import generate_password_hash, check_password_hash
-from flasgger import  Swagger
+from flasgger import Swagger
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
-swagger = Swagger(app)
+SWAGGER_TEMPLATE = {
+    "securityDefinitions": {"APIKeyHeader": {"type": "apiKey", "name": "x-access-tokens", "in": "header"}}}
+app.config['SWAGGER'] = {
+    'title': 'Exp7 API'
+}
+swagger = Swagger(app, template=SWAGGER_TEMPLATE)
+
 
 def decode_token(auth_token):
     try:
@@ -27,6 +33,7 @@ def decode_token(auth_token):
 def token_required(f):
     @wraps(f)
     def decorator(*args, **kwargs):
+        print(request.headers)
         token = None
         if 'x-access-tokens' in request.headers:
             token = request.headers['x-access-tokens']
@@ -114,48 +121,50 @@ account_service = Service("Account Service", "127.0.0.1", 5000)
 circuit_breaker = CircuitBreaker(10000, 3)
 
 
-
-
-
-
 @app.route('/signup', methods=['POST'])
 def signup():
     """signup users
     This is using docstrings for specifications.
     ---
-    parameters:
-      - name: national_id
-        in  : body
-        type: string
-        required: true
-        default:
+      tags:
+        - users
+      parameters:
+        - in: body
+          name: user
+          description: The user to create.
+          schema:
+            type: object
+            required:
+              - national_id
+            required:
+              - password
+            required:
+              - name
+            required:
+              - role
 
-      - name: password
-        in : body
-        type: string
-        required: true
-        default:
-      - name: name
-        in : body
-        type: string
-        required: true
-        default:
-      - name: role
-        in : body
-        type: string
-        required: true
-        default: doctor
-    responses:
-      201:
-        description: user created
+            properties:
+              national_id:
+                type: string
+              password:
+                type: string
+              name:
+                type: string
+              role:
+                type: string
+                default: doctor
+      responses:
+        201:
+          description: user created
 
-      409:
-        description: user already exists
+        409:
+          description: user already exists
 
-      400:
-        description: Bad request
+        400:
+          description: Bad request
 
     """
+    print(request)
     json = request.json
     print(request.json)
     try:
@@ -174,29 +183,39 @@ def admin_signup():
     """signup admins
     This is using docstrings for specifications.
     ---
-    parameters:
-      - name: username
-        in : body
-        type: string
-        required: true
-        default:
-      - name: password
-        in: body
-        type: string
-        required: true
+      tags:
+       - users
+      parameters:
+        - in: body
+          name: user
+          description: The user to create.
+          schema:
+            type: object
+            required:
+              - username
+            required:
+              - password
 
 
-    responses:
-      201:
-        description: user created
+            properties:
+              username:
+                type: string
+              password:
+                type: string
 
-      409:
-        description: user already exists
+      responses:
+        201:
+          description: user created
 
-      400:
-        description: Bad request
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
 
     """
+    print('kose khare khoshtipe faghat ba ye dast lebas , ah')
+    print(request)
     json = request.json
     print(request.json)
     try:
@@ -212,6 +231,41 @@ def admin_signup():
 
 @app.route('/signin', methods=['POST'])
 def signin():
+    """sign in users
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      parameters:
+        - in: body
+          name: user
+          description: The user to create.
+          schema:
+            type: object
+            required:
+              - national_id
+            required:
+              - password
+
+
+            properties:
+              national_id:
+                type: string
+              password:
+                type: string
+
+      responses:
+        200:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+     """
+
     json = request.json
     try:
         n_id = json.get('national_id')
@@ -241,6 +295,41 @@ def signin():
 
 @app.route('/admin-signin', methods=['POST'])
 def admin_signin():
+    """sign in admins
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      parameters:
+        - in: body
+          name: user
+          description: The user to create.
+          schema:
+            type: object
+            required:
+              - username
+            required:
+              - password
+
+
+            properties:
+              username:
+                type: string
+              password:
+                type: string
+
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+    """
+
     json = request.json
     try:
         username = json.get('username')
@@ -271,6 +360,24 @@ def admin_signin():
 @app.route('/doctors', methods=['GET'])
 @token_required
 def get_doctors(username):
+    """get doctors by admins
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+    """
     success_url = "/show_doctors"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
@@ -279,6 +386,24 @@ def get_doctors(username):
 @app.route('/patients', methods=['GET'])
 @token_required
 def get_patients(username):
+    """get all patients detail by admins
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+    """
     success_url = "/show_patients"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
@@ -287,6 +412,24 @@ def get_patients(username):
 @app.route("/profile")
 @token_required
 def user_profile(username):
+    """get userprofile by each user
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+    """
     success_url = "/user_profile"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
@@ -295,6 +438,24 @@ def user_profile(username):
 @app.route("/profile-admin")
 @token_required
 def admin_profile(username):
+    """get profile admin by each admin
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - users
+      security:
+        - APIKeyHeader: ['x-access-tokens   ']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+
+    """
     success_url = "/admin_profile"
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
