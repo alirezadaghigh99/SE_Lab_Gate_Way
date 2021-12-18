@@ -1,5 +1,4 @@
 from functools import wraps
-
 import jwt
 from flask import Flask, request
 from flask.json import jsonify
@@ -9,6 +8,7 @@ import datetime
 import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from flasgger import Swagger
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
@@ -35,6 +35,7 @@ def token_required(f):
     def decorator(*args, **kwargs):
         print(request.headers)
         token = None
+
         if 'x-access-tokens' in request.headers:
             token = request.headers['x-access-tokens']
         if not token:
@@ -118,6 +119,7 @@ class CircuitBreaker:
 
 
 account_service = Service("Account Service", "127.0.0.1", 5000)
+prescription_service = Service("Prescription Service", "127.0.0.1", 5002)
 circuit_breaker = CircuitBreaker(10000, 3)
 
 
@@ -460,6 +462,67 @@ def admin_profile(username):
     response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
     return response.content, response.status_code, response.headers.items()
 
+
+@app.route("/prescription", methods=['POST'])
+@token_required
+def create_prescription(username):
+    """Create prescription
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - user
+      parameters:
+        - in: body
+          name: user
+          description: The prescription to create.
+          schema:
+            type: object
+            required:
+              - patient_id
+            required:
+              - drug
+
+
+            properties:
+              patient_id:
+                type: string
+              drug:
+                type: string
+              comment:
+                type: string
+
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        200:
+          description: prescription created
+
+        409:
+          description: prescription already exists
+
+        400:
+          description: Bad request
+
+     """
+    success_url = f"/user/{username}"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+    user = response.json()["user"]
+    if user['role'] != "doctor":
+        return jsonify({"message" : "you must be a doctor"}), HTTPStatus.UNAUTHORIZED
+    data = request.json
+    username_p = data["patient_id"]
+    success_url = f"/user/{username_p}"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response.status_code != HTTPStatus.OK:
+        return jsonify({"message" : "this user is not exists"})
+    success_url = "/prescription"
+    data = request.json
+    print(data)
+    data["doctor_id"] = username
+    response = circuit_breaker.send_request(requests.post, prescription_service, success_url, json=data)
+    return response.content, response.status_code, response.headers.items()
 
 @app.route("/")
 def home():
