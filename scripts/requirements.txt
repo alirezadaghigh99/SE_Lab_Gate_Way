@@ -1,1 +1,4 @@
 flasgger
+PyJWT
+flask
+flask_sqlalchemy
