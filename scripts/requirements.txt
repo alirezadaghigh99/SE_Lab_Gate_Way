@@ -2,3 +2,5 @@ flasgger
 PyJWT
 flask
 flask_sqlalchemy
+flask_migrate
+event_bus

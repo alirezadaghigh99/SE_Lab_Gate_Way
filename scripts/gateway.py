@@ -9,7 +9,6 @@ import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from flasgger import Swagger
 
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret key'
 SWAGGER_TEMPLATE = {
@@ -89,7 +88,6 @@ class CircuitBreaker:
                     status.state = 'h'
         else:
             status = self.services[service.id] = ServiceState()
-        response = Response()
         try:
             status.last_attempt = datetime.datetime.now()
             uri = service.url + url
@@ -470,10 +468,10 @@ def create_prescription(username):
     This is using docstrings for specifications.
     ---
       tags:
-       - user
+       - prescription
       parameters:
         - in: body
-          name: user
+          name: prescription
           description: The prescription to create.
           schema:
             type: object
@@ -510,19 +508,58 @@ def create_prescription(username):
         return response.content, response.status_code, response.headers.items()
     user = response.json()["user"]
     if user['role'] != "doctor":
-        return jsonify({"message" : "you must be a doctor"}), HTTPStatus.UNAUTHORIZED
+        return jsonify({"message": "you must be a doctor"}), HTTPStatus.UNAUTHORIZED
     data = request.json
     username_p = data["patient_id"]
     success_url = f"/user/{username_p}"
     response = circuit_breaker.send_request(requests.get, account_service, success_url)
     if response.status_code != HTTPStatus.OK:
-        return jsonify({"message" : "this user is not exists"})
+        return jsonify({"message": "this user not exists"})
+    user_p = response.json()["user"]
+    if user_p['role'] != "patient":
+        return jsonify({"message": "this user is not a patient"}), HTTPStatus.UNAUTHORIZED
     success_url = "/prescription"
     data = request.json
     print(data)
     data["doctor_id"] = username
     response = circuit_breaker.send_request(requests.post, prescription_service, success_url, json=data)
     return response.content, response.status_code, response.headers.items()
+
+
+@app.route('/prescriptions', methods=['GET'])
+@token_required
+def show_prescriptions(username):
+    """Show prescriptions
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - prescription
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+     """
+    success_url = f"/user/{username}"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+    user = response.json()["user"]
+    user_dic = {
+        "role": user["role"],
+        "national_id": user["national_id"]
+    }
+    get_prescription_url = "/prescription/query"
+    response = circuit_breaker.send_request(requests.get, prescription_service,
+                                            get_prescription_url, params=user_dic)
+    return response.content, response.status_code, response.headers.items()
+
 
 @app.route("/")
 def home():
