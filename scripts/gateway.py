@@ -567,7 +567,9 @@ def show_prescriptions(username):
     get_prescription_url = "/prescription/query"
     response = circuit_breaker.send_request(requests.get, prescription_service,
                                             get_prescription_url, params=user_dic)
-    role_id = None
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+    opp_role = None
     if user["role"] == "doctor":
         opp_role = "patient"
     elif user["role"] == "patient":
@@ -613,6 +615,8 @@ def show_prescriptions_admin(username):
     get_prescription_url = "/prescription/query"
     response = circuit_breaker.send_request(requests.get, prescription_service,
                                             get_prescription_url, params=user_dic)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
     output = []
     for data in response.json():
         append_profile_to_data(data, "doctor", is_admin=True)
@@ -622,6 +626,79 @@ def show_prescriptions_admin(username):
     the_response.status_code = response.status_code
     the_response._content = json.dumps(output).encode("utf-8")
     the_response.headers = response.headers
+    return the_response.content, the_response.status_code, the_response.headers.items()
+
+
+@app.route('/daily', methods=['GET'])
+@token_required
+def show_stats_admin(username):
+    """Show prescriptions to admin
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - statistics
+      parameters:
+        - in: query
+          name: day
+          required: true
+          schema:
+            type: string
+          description: (Example -> 20)
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: string
+          description: (Example -> Dec, Feb)
+        - in: query
+          name: year
+          required: true
+          schema:
+            type: string
+          description: (Example -> 2021)
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+     """
+    success_url = f"/admin/{username}"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+
+    response_dict = {}
+    get_prescription_url = "/prescription/stats"
+    prescription_response = circuit_breaker.send_request(requests.get, prescription_service,
+                                                         get_prescription_url, params=request.args)
+    if prescription_response.status_code != HTTPStatus.OK:
+        return prescription_response.content, prescription_response.status_code, prescription_response.headers.items()
+    response_dict["prescription count"] = len(prescription_response.json())
+
+    get_patient_url = "/patients/stats"
+    patient_response = circuit_breaker.send_request(requests.get, account_service,
+                                                    get_patient_url, params=request.args)
+    if patient_response.status_code != HTTPStatus.OK:
+        return patient_response.content, patient_response.status_code, patient_response.headers.items()
+    response_dict["patient sign ups count"] = len(patient_response.json())
+
+    get_doctor_url = "/doctors/stats"
+    doctor_response = circuit_breaker.send_request(requests.get, account_service,
+                                                   get_doctor_url, params=request.args)
+    if doctor_response.status_code != HTTPStatus.OK:
+        return doctor_response.content, doctor_response.status_code, doctor_response.headers.items()
+    response_dict["doctor sign ups count"] = len(doctor_response.json())
+
+    the_response = Response()
+    the_response.status_code = prescription_response.status_code
+    the_response._content = json.dumps(response_dict).encode("utf-8")
+    the_response.headers = prescription_response.headers
     return the_response.content, the_response.status_code, the_response.headers.items()
 
 
