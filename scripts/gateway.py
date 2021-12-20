@@ -1,3 +1,4 @@
+import json
 from functools import wraps
 import jwt
 from flask import Flask, request
@@ -32,7 +33,6 @@ def decode_token(auth_token):
 def token_required(f):
     @wraps(f)
     def decorator(*args, **kwargs):
-        print(request.headers)
         token = None
 
         if 'x-access-tokens' in request.headers:
@@ -164,9 +164,7 @@ def signup():
           description: Bad request
 
     """
-    print(request)
     json = request.json
-    print(request.json)
     try:
         password = json.pop('password', None)
 
@@ -214,10 +212,7 @@ def admin_signup():
           description: Bad request
 
     """
-    print('kose khare khoshtipe faghat ba ye dast lebas , ah')
-    print(request)
     json = request.json
-    print(request.json)
     try:
         password = json.pop('password', None)
 
@@ -520,10 +515,24 @@ def create_prescription(username):
         return jsonify({"message": "this user is not a patient"}), HTTPStatus.UNAUTHORIZED
     success_url = "/prescription"
     data = request.json
-    print(data)
     data["doctor_id"] = username
     response = circuit_breaker.send_request(requests.post, prescription_service, success_url, json=data)
     return response.content, response.status_code, response.headers.items()
+
+
+def append_profile_to_data(data, role, is_admin=False):
+    id = data[f"{role}_id"]
+    success_url = f"/user/{id}"
+    response_user = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response_user.status_code != HTTPStatus.OK:
+        return response_user.content, response_user.status_code, response_user.headers.items()
+    user_detected = response_user.json()["user"]
+    if not is_admin:
+        your_keys = ['name', "role"]
+    else:
+        your_keys = ['national_id', 'name', "role"]
+    dict_you_want = {your_key: user_detected[your_key] for your_key in your_keys}
+    data[f"{role}_profile"] = dict_you_want
 
 
 @app.route('/prescriptions', methods=['GET'])
@@ -558,7 +567,62 @@ def show_prescriptions(username):
     get_prescription_url = "/prescription/query"
     response = circuit_breaker.send_request(requests.get, prescription_service,
                                             get_prescription_url, params=user_dic)
-    return response.content, response.status_code, response.headers.items()
+    role_id = None
+    if user["role"] == "doctor":
+        opp_role = "patient"
+    elif user["role"] == "patient":
+        opp_role = "doctor"
+    output = []
+    for data in response.json():
+        append_profile_to_data(data, opp_role)
+        output.append(data)
+    the_response = Response()
+    the_response.status_code = response.status_code
+    the_response._content = json.dumps(output).encode("utf-8")
+    the_response.headers = response.headers
+    return the_response.content, the_response.status_code, the_response.headers.items()
+
+
+@app.route('/prescriptions/admin', methods=['GET'])
+@token_required
+def show_prescriptions_admin(username):
+    """Show prescriptions to admin
+    This is using docstrings for specifications.
+    ---
+      tags:
+       - prescription
+      security:
+        - APIKeyHeader: ['x-access-tokens']
+      responses:
+        201:
+          description: user created
+
+        409:
+          description: user already exists
+
+        400:
+          description: Bad request
+     """
+    success_url = f"/admin/{username}"
+    response = circuit_breaker.send_request(requests.get, account_service, success_url)
+    if response.status_code != HTTPStatus.OK:
+        return response.content, response.status_code, response.headers.items()
+    user_dic = {
+        "role": "admin"
+    }
+    get_prescription_url = "/prescription/query"
+    response = circuit_breaker.send_request(requests.get, prescription_service,
+                                            get_prescription_url, params=user_dic)
+    output = []
+    for data in response.json():
+        append_profile_to_data(data, "doctor", is_admin=True)
+        append_profile_to_data(data, "patient", is_admin=True)
+        output.append(data)
+    the_response = Response()
+    the_response.status_code = response.status_code
+    the_response._content = json.dumps(output).encode("utf-8")
+    the_response.headers = response.headers
+    return the_response.content, the_response.status_code, the_response.headers.items()
 
 
 @app.route("/")
