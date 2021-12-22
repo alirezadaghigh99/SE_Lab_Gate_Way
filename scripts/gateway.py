@@ -203,7 +203,7 @@ def admin_signup():
 
       responses:
         201:
-          description: user created
+          description: admin created
 
         409:
           description: user already exists
@@ -314,11 +314,8 @@ def admin_signin():
                 type: string
 
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
@@ -364,10 +361,7 @@ def get_doctors(username):
         - APIKeyHeader: ['x-access-tokens']
       responses:
         201:
-          description: user created
-
-        409:
-          description: user already exists
+          description: ok
 
         400:
           description: Bad request
@@ -389,11 +383,9 @@ def get_patients(username):
       security:
         - APIKeyHeader: ['x-access-tokens']
       responses:
-        201:
-          description: user created
+        200:
+          description: ok
 
-        409:
-          description: user already exists
 
         400:
           description: Bad request
@@ -415,11 +407,8 @@ def user_profile(username):
       security:
         - APIKeyHeader: ['x-access-tokens']
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
@@ -441,11 +430,8 @@ def admin_profile(username):
       security:
         - APIKeyHeader: ['x-access-tokens   ']
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
@@ -488,7 +474,7 @@ def create_prescription(username):
         - APIKeyHeader: ['x-access-tokens']
       responses:
         200:
-          description: prescription created
+          description: description created
 
         409:
           description: prescription already exists
@@ -546,11 +532,8 @@ def show_prescriptions(username):
       security:
         - APIKeyHeader: ['x-access-tokens']
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
@@ -596,11 +579,8 @@ def show_prescriptions_admin(username):
       security:
         - APIKeyHeader: ['x-access-tokens']
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
@@ -649,7 +629,7 @@ def show_stats_admin(username):
           required: true
           schema:
             type: string
-          description: (Example -> Dec, Feb)
+          description: (Example -> 12, 11)
         - in: query
           name: year
           required: true
@@ -659,11 +639,8 @@ def show_stats_admin(username):
       security:
         - APIKeyHeader: ['x-access-tokens']
       responses:
-        201:
-          description: user created
-
-        409:
-          description: user already exists
+        200:
+          description: ok
 
         400:
           description: Bad request
