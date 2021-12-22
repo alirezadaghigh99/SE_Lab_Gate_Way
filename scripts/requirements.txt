@@ -1,6 +1,7 @@
-flasgger
-PyJWT
 flask
 flask_sqlalchemy
+requests
+flasgger
+PyJWT
 flask_migrate
 event_bus
