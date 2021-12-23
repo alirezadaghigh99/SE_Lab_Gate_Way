@@ -1,7 +1,7 @@
 import json
 from functools import wraps
 import jwt
-from flask import Flask, request
+from flask import Flask, request, session
 from flask.json import jsonify
 from requests.models import Response
 from http import HTTPStatus
@@ -77,7 +77,7 @@ class CircuitBreaker:
 
         if service.id in self.services:
             status = self.services[service.id]
-            if status.state == 'o':
+            if status.state == 'o' and False:
                 if datetime.datetime.now() - status.last_attempt <= datetime.timedelta(milliseconds=self.time_out):
                     response = Response()
                     response.status_code = HTTPStatus.SERVICE_UNAVAILABLE
@@ -103,7 +103,8 @@ class CircuitBreaker:
                     status.state = 'c'
                     status.num_of_failures = 0
 
-        except:
+        except Exception as e:
+            print(e.__str__())
             status.num_of_failures += 1
             response = Response()
             response.status_code = HTTPStatus.SERVICE_UNAVAILABLE
@@ -121,14 +122,21 @@ prescription_service = Service("Prescription Service", "127.0.0.1", 5002)
 circuit_breaker = CircuitBreaker(10000, 3)
 
 
-@app.route('/signup', methods=['POST'])
-def signup():
+@app.route('/signup/<role>', methods=['POST'])
+def signup(role):
     """signup users
     This is using docstrings for specifications.
     ---
       tags:
         - users
       parameters:
+        - in: path
+          name: role
+          description: you should enter role of user(doctor or patient)
+          required: true
+          type: string
+
+
         - in: body
           name: user
           description: The user to create.
@@ -140,8 +148,7 @@ def signup():
               - password
             required:
               - name
-            required:
-              - role
+
 
             properties:
               national_id:
@@ -150,9 +157,7 @@ def signup():
                 type: string
               name:
                 type: string
-              role:
-                type: string
-                default: doctor
+
       responses:
         201:
           description: user created
@@ -172,7 +177,7 @@ def signup():
         return jsonify(message='Password is not given'), HTTPStatus.BAD_REQUEST
 
     json['hashed_passwd'] = generate_password_hash(password)
-    response = circuit_breaker.send_request(requests.post, account_service, "/create_user", json=json)
+    response = circuit_breaker.send_request(requests.post, account_service, f"/create_user/{role}", json=json)
     return response.content, response.status_code, response.headers.items()
 
 
@@ -224,14 +229,19 @@ def admin_signup():
     return response.content, response.status_code, response.headers.items()
 
 
-@app.route('/signin', methods=['POST'])
-def signin():
+@app.route('/signin/<role>', methods=['POST'])
+def signin(role):
     """sign in users
     This is using docstrings for specifications.
     ---
       tags:
        - users
       parameters:
+        - in: path
+          name: role
+          description: you should enter role of user(doctor or patient)
+          required: true
+          type: string
         - in: body
           name: user
           description: The user to create.
@@ -271,7 +281,7 @@ def signin():
         password = json.get('password')
     except:
         return jsonify(message="Password is not given"), HTTPStatus.BAD_REQUEST
-    user_url = f"/user/{n_id}"
+    user_url = f"/user/{role}/{n_id}"
     response = circuit_breaker.send_request(requests.get, account_service, user_url)
     if response.status_code != HTTPStatus.OK:
         return response.content, response.status_code, response.headers.items()
@@ -284,6 +294,7 @@ def signin():
             'exp': expire_time
         }
         token = jwt.encode(payload, app.config.get('SECRET_KEY'), algorithm='HS256')
+        session["role"] = role
         return jsonify(message="Login Successful", jwt=token), HTTPStatus.OK
     return jsonify(message='Invalid Password'), HTTPStatus.UNAUTHORIZED
 
@@ -415,7 +426,12 @@ def user_profile(username):
 
     """
     success_url = "/user_profile"
-    response = circuit_breaker.send_request(requests.get, account_service, success_url, username)
+    print(session["role"])
+    data = {
+        "username":username,
+        'role':session["role"]
+    }
+    response = circuit_breaker.send_request(requests.get, account_service, success_url,data)
     return response.content, response.status_code, response.headers.items()
 
 
@@ -483,22 +499,16 @@ def create_prescription(username):
           description: Bad request
 
      """
-    success_url = f"/user/{username}"
-    response = circuit_breaker.send_request(requests.get, account_service, success_url)
-    if response.status_code != HTTPStatus.OK:
-        return response.content, response.status_code, response.headers.items()
-    user = response.json()["user"]
-    if user['role'] != "doctor":
+    if session['role'] != "doctor":
         return jsonify({"message": "you must be a doctor"}), HTTPStatus.UNAUTHORIZED
+
     data = request.json
     username_p = data["patient_id"]
-    success_url = f"/user/{username_p}"
+    success_url = f"/user/patient/{username_p}"
     response = circuit_breaker.send_request(requests.get, account_service, success_url)
     if response.status_code != HTTPStatus.OK:
         return jsonify({"message": "this user not exists"})
-    user_p = response.json()["user"]
-    if user_p['role'] != "patient":
-        return jsonify({"message": "this user is not a patient"}), HTTPStatus.UNAUTHORIZED
+
     success_url = "/prescription"
     data = request.json
     data["doctor_id"] = username
@@ -508,16 +518,17 @@ def create_prescription(username):
 
 def append_profile_to_data(data, role, is_admin=False):
     id = data[f"{role}_id"]
-    success_url = f"/user/{id}"
+    success_url = f"/user/{role}/{id}"
     response_user = circuit_breaker.send_request(requests.get, account_service, success_url)
     if response_user.status_code != HTTPStatus.OK:
         return response_user.content, response_user.status_code, response_user.headers.items()
     user_detected = response_user.json()["user"]
     if not is_admin:
-        your_keys = ['name', "role"]
+        your_keys = ['name']
     else:
-        your_keys = ['national_id', 'name', "role"]
+        your_keys = ['national_id', 'name']
     dict_you_want = {your_key: user_detected[your_key] for your_key in your_keys}
+    dict_you_want["role"] = role
     data[f"{role}_profile"] = dict_you_want
 
 
@@ -538,13 +549,13 @@ def show_prescriptions(username):
         400:
           description: Bad request
      """
-    success_url = f"/user/{username}"
+    success_url = f"/user/{session['role']}/{username}"
     response = circuit_breaker.send_request(requests.get, account_service, success_url)
     if response.status_code != HTTPStatus.OK:
         return response.content, response.status_code, response.headers.items()
     user = response.json()["user"]
     user_dic = {
-        "role": user["role"],
+        "role": session["role"],
         "national_id": user["national_id"]
     }
     get_prescription_url = "/prescription/query"
@@ -553,9 +564,9 @@ def show_prescriptions(username):
     if response.status_code != HTTPStatus.OK:
         return response.content, response.status_code, response.headers.items()
     opp_role = None
-    if user["role"] == "doctor":
+    if session["role"] == "doctor":
         opp_role = "patient"
-    elif user["role"] == "patient":
+    elif session["role"] == "patient":
         opp_role = "doctor"
     output = []
     for data in response.json():
