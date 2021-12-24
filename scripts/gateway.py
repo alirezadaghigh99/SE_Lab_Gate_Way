@@ -77,7 +77,7 @@ class CircuitBreaker:
 
         if service.id in self.services:
             status = self.services[service.id]
-            if status.state == 'o' and False:
+            if status.state == 'o':
                 if datetime.datetime.now() - status.last_attempt <= datetime.timedelta(milliseconds=self.time_out):
                     response = Response()
                     response.status_code = HTTPStatus.SERVICE_UNAVAILABLE
