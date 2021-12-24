@@ -4,8 +4,7 @@
   cd scripts
  ```
  ```
-  docker-compose build
-  docker-compose up
+  python gateway.py
  ```
  
  open url shows you <br>
